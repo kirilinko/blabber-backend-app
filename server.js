@@ -6,6 +6,7 @@ var bodyParser = require("body-parser");
 
 var indexRouter = require('./Routes/index/Index');
 var userRouter = require('./Routes/User/User');
+var contactRouter = require('./Routes/Contact/Contact');
 
 process.env.SECRET_KEY = "groupe7Ifri";
 
@@ -19,6 +20,7 @@ app.use(bodyParser.urlencoded({
 
 app.use('/', indexRouter);
 app.use('/user', userRouter);
+app.use('/user/contact', contactRouter);
 
 
 var port = process.env.PORT || 3000;
