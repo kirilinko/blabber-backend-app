@@ -2,11 +2,13 @@ var express = require('express');
 var cors = require('cors');
 var bodyParser = require("body-parser");
 
-// Routes
+// Routes 
 
-var indexRouter = require('./Routes/index/Index');
+var indexRouter = require('./Routes/Index/Index');
 var userRouter = require('./Routes/User/User');
+var requestRouter = require('./Routes/Request/Request');
 var contactRouter = require('./Routes/Contact/Contact');
+var discussionRouter = require('./Routes/Discussion/Discussion');
 
 process.env.SECRET_KEY = "groupe7Ifri";
 
@@ -21,6 +23,8 @@ app.use(bodyParser.urlencoded({
 app.use('/', indexRouter);
 app.use('/user', userRouter);
 app.use('/user/contact', contactRouter);
+app.use('/user/request', requestRouter);
+app.use('/user/discussion', discussionRouter);
 
 
 var port = process.env.PORT || 3000;

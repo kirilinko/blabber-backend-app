@@ -4,7 +4,7 @@ var index = express.Router();
 const bcrypt = require('bcrypt');
 var jwt = require('jsonwebtoken');
 var database = require('../../Database/database');
-var token;
+
 
 
 
@@ -13,27 +13,39 @@ index.use(cors());
 // inscription utilisateur
 
 index.post('/inscription', function(req, res) {
-    var { email, username, firstname, lastname, password, createdAt, updatedAt } = req.body;
-    
-    bcrypt.hash(password, 10, function(err, hash) {
-        if (err) {
-          console.error('Erreur lors du hachage du mot de passe :', err);
-        } 
-         else {
-            password=hash;
-            const userData = { email, username, firstname, lastname, password, createdAt, updatedAt };
-            database.query('INSERT INTO users SET ?', userData, (error, results) => {
-              if (error) {
-              console.error('Erreur lors de l\'insertion :', error);
-              res.status(500).json({ error: 'Une erreur est survenue lors de l\'insertion.' });
-           }
-            else {
-              console.log('Insertion réussie. ID inséré :', results.insertId);
-              res.status(200).json({ message: 'Inscription correctement effectué !.', userId: results.insertId });
-            } });
+  var { email, username, firstname, lastname, password } = req.body;
+  var createdAt = new Date(); 
+  var updatedAt = new Date();
+
+  bcrypt.hash(password, 10, function(err, hash) {
+    if (err) {
+      console.error('Erreur lors du hachage du mot de passe :', err);
+      res.status(500).json({ error: 'Une erreur est survenue lors du hachage du mot de passe.' });
+    } else {
+      password = hash;
+      const userData = { email, username, firstname, lastname, password, createdAt, updatedAt };
+      database.query('INSERT INTO users SET ?', userData, (error, results) => {
+        if (error) {
+          console.error('Erreur lors de l\'insertion :', error);
+          res.status(500).json({ error: 'Une erreur est survenue lors de l\'insertion.' });
+        } else {
+          const insertedUserId = results.insertId;
+          database.query('SELECT email, username, firstname, lastname, createdAt, updatedAt FROM users WHERE id = ?', insertedUserId, (error, userResults) => {
+            if (error) {
+              console.error('Erreur lors de la récupération des informations de l\'utilisateur :', error);
+              res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur.' });
+            } else {
+              const user = userResults[0];
+              delete user.password;
+              res.status(200).json({user});
+            }
+          });
         }
-    });
+      });
+    }
+  });
 });
+
 
 // connexion utilisateur
 
@@ -59,8 +71,10 @@ index.post('/connexion', function(req, res) {
                           console.error('Erreur lors de la comparaison :', err);
                         } else {
                           if (result) {
-                            const token = jwt.sign({ utilisateurId: utilisateur.id }, process.env.SECRET_KEY, { expiresIn: '1h' });
-                            res.status(200).json({ message: 'Connexion réussie.', token });
+                            const token = jwt.sign({ utilisateurId: utilisateur.id }, process.env.SECRET_KEY, { expiresIn: '4h' });
+                            delete results[0].password
+                            users=results[0]
+                            res.status(200).json({statut:true, users , token });
                             console.log('Les valeurs correspondent.');
                           } else {
                             res.status(401).json({ error: 'Mot de passe incorrect.' });
@@ -75,9 +89,5 @@ index.post('/connexion', function(req, res) {
 
 });
 
-index.post('/renitialisation', function(req, res) {
-
-
-});
 
 module.exports = index;

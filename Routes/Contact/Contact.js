@@ -34,7 +34,7 @@ contact.get('/liste', function(req, res) {
     var decodedToken = jwt.decode(token);
     const utilisateurId = decodedToken.utilisateurId; 
     var sql = `
-    SELECT contacts.*, users.id, users.email, users.username, users.firstname, users.lastname, users.photoUrl 
+    SELECT contacts.*, users.id as friend_id, users.email, users.username, users.firstname, users.lastname, users.photoUrl 
     FROM contacts
     INNER JOIN users ON (contacts.userid2 = users.id OR contacts.userid1 = users.id)
     WHERE (contacts.userid1 = ? OR contacts.userid2 = ?) AND users.id <> ?
@@ -51,17 +51,22 @@ contact.get('/liste', function(req, res) {
 
 });
 
-/* recherche un contacts par nom ou prenom  */
-contact.get('/recherche/:valeur', function(req, res) {
-  const valeur = req.params.valeur;
+/* recherche un contacts par nom ou prenom  ou email ou username */
+contact.get('/:idcontact', function(req, res) {
+  const {idcontact} = req.params;
+
   token = req.body.token || req.headers['authorization'];
   var decodedToken = jwt.decode(token);
   const utilisateurId = decodedToken.utilisateurId;   
   
-  const sql = `SELECT users.id, users.email, users.username, users.firstname, users.lastname, users.photoUrl FROM users INNER JOIN contacts ON (contacts.userid2 = users.id OR contacts.userid1 = users.id)
-  WHERE (contacts.userid1 = ? OR contacts.userid2 = ?) AND users.id <> ? AND (users.firstname LIKE '%${valeur}%' OR users.lastname LIKE '%${valeur}%') `;
-  
-  database.query(sql,[utilisateurId, utilisateurId, utilisateurId], (error, results) => {
+  var sql = `
+    SELECT contacts.*, users.id as friend_id, users.email, users.username, users.firstname, users.lastname, users.photoUrl 
+    FROM contacts
+    INNER JOIN users ON (contacts.userid2 = users.id OR contacts.userid1 = users.id)
+    WHERE (contacts.userid1 = ? OR contacts.userid2 = ?) AND users.id <> ? AND contacts.id=?
+  `
+
+  database.query(sql,[utilisateurId, utilisateurId, utilisateurId, idcontact], (error, results) => {
       if (error) {
           console.error('Erreur lors de la recherche des utilisateurs :', error);
           res.status(500).json({ error: 'Une erreur est survenue lors de la recherche des utilisateurs.' });
@@ -73,32 +78,88 @@ contact.get('/recherche/:valeur', function(req, res) {
 });
 
 
-/* obtenir les informations d'un contact*/
-contact.get('/:id', function(req, res) {
-  const utilisateurId = req.params.id;
-  
-  const query = 'SELECT id, email, username, firstname, lastname, photoUrl FROM users WHERE id = ?';
-  
-  database.query(query, [utilisateurId], (error, results) => {
-      if (error) {
-          console.error('Erreur lors de la récupération des informations de l\'utilisateur :', error);
-          res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des informations de l\'utilisateur.' });
-      } else {
-          if (results.length === 0) {
-              res.status(404).json({ error: 'Utilisateur non trouvé.' });
-          } else {
-              const utilisateur = results[0];
-              res.status(200).json(utilisateur);
-          }
-      }
+
+
+/* supprimer un contact  */
+contact.delete('/:contactId', function(req, res) {
+  const { contactId } = req.params;
+
+  database.query('DELETE FROM contacts WHERE id = ?', [contactId], (error, deleteResults) => {
+    if (error) {
+      console.error('Erreur lors de la suppression du contact :', error);
+      res.status(500).json({ error: 'Une erreur est survenue lors de la suppression du contact.' });
+    } else if (deleteResults.affectedRows === 0) {
+      res.status(404).json({ error: 'Contact introuvable.' });
+    } else {
+      res.status(200).json({ success: true, message: 'Le contact a été supprimé avec succès.' });
+    }
   });
 });
 
 
-/* Voir la liste des demandes en contact  */
-contact.post('/demandes', function(req, res) {
 
+// bloquer un contact
 
+contact.patch('/:contactId', function(req, res) {
+  token = req.body.token || req.headers['authorization'];
+  var decodedToken = jwt.decode(token);
+  const userId = decodedToken.utilisateurId; 
+  const { contactId } = req.params;
+  var {blocked} = req.query;
+  const updatedAt = new Date();
+  blocked=blocked.toLowerCase() === 'true'
+   
+
+  // Vérifier si le contact existe
+  const checkContactQuery = 'SELECT * FROM contacts WHERE id = ?';
+  database.query(checkContactQuery, [contactId], (error, contactResults) => {
+    if (error) {
+      console.error('Erreur lors de la vérification du contact :', error);
+      res.status(500).json({ error: 'Une erreur est survenue lors de la vérification du contact.' });
+    } else if (contactResults.length === 0) {
+      res.status(404).json({ error: 'Contact introuvable.' });
+    } else {
+      const contact = contactResults[0];
+      let blockedUserIdColumn = ''; // Colonne à mettre à jour en fonction de l'utilisateur bloquant
+      
+      // Vérifier si l'utilisateur est lié au contact en tant que userId1 ou userId2
+      if (userId == contact.userid1) {
+        blockedUserIdColumn = 'blockedUserid1';
+      } else if (userId == contact.userid2) {
+        blockedUserIdColumn = 'blockedUserid2';
+      } else {
+        res.status(400).json({ error: 'Vous n\'êtes pas autorisé à bloquer ce contact.' });
+        return;
+      }
+       console.log( blocked);
+      // Mettre à jour le contact avec l'utilisateur bloqué
+      const updateContactQuery = `UPDATE contacts SET ${blockedUserIdColumn} = ?, updatedAt = ? WHERE id = ?`;
+      database.query(updateContactQuery, [blocked, updatedAt, contactId], (error, updateResults) => {
+        if (error) {
+          console.error('Erreur lors de la mise à jour du contact :', error);
+          res.status(500).json({ error: 'Une erreur est survenue lors de la mise à jour du contact.' });
+        } else {
+          var sql = `
+          SELECT contacts.*, users.id as friend_id, users.email, users.username, users.firstname, users.lastname, users.photoUrl 
+          FROM contacts
+          INNER JOIN users ON (contacts.userid2 = users.id OR contacts.userid1 = users.id)
+          WHERE (contacts.userid1 = ? OR contacts.userid2 = ?) AND users.id <> ? AND contacts.id=?
+        `
+      
+        database.query(sql,[userId, userId, userId, contactId], (error, results) => {
+            if (error) {
+                console.error('Erreur lors de la recherche des utilisateurs :', error);
+                res.status(500).json({ error: 'Une erreur est survenue lors de la recherche des utilisateurs.' });
+            } else {
+                res.status(200).json(results);
+            }
+        });
+        }
+      });
+    }
+  });
 });
+
+
 
 module.exports = contact;
