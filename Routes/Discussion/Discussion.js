@@ -166,7 +166,7 @@ discussion.patch('/archive/:discussionId', function(req, res) {
 
 // Route pour mettre à jour les informations d'une discussion
 discussion.patch('/:discussionId', function(req, res) {
-  const discussionId = req.params.discussionId;
+  const {discussionId} = req.params;
   const { name, description } = req.body;
 
   // Mettre à jour les informations de la discussion
@@ -179,26 +179,185 @@ discussion.patch('/:discussionId', function(req, res) {
       res.status(404).json({ error: 'Discussion introuvable.' });
     } else {
       // Récupérer les informations mises à jour de la discussion
-      const getDiscussionQuery = 'SELECT * FROM discussions WHERE id = ?';
-      database.query(getDiscussionQuery, [discussionId], (error, results) => {
-        if (error) {
-          console.error('Erreur lors de la récupération de la discussion :', error);
-          res.status(500).json({ error: 'Une erreur est survenue lors de la récupération de la discussion.' });
+      const getDiscussionQuery = `
+      SELECT d.*, p.id AS participantId, p.userId, p.isAdmin, p.addedAt, p.hasNewNotif, p.isArchivedChat
+      FROM discussions d
+      INNER JOIN participants p ON d.id = p.discussionid
+      WHERE d.id = ?
+    `;
+    database.query(getDiscussionQuery, [discussionId], (error, results) => {
+      if (error) {
+        console.error('Erreur lors de la récupération de la discussion :', error);
+        res.status(500).json({ error: 'Une erreur est survenue lors de la récupération de la discussion.' });
+      } else {
+        if (results.length === 0) {
+          res.status(404).json({ error: 'Discussion introuvable.' });
         } else {
-          if (results.length === 0) {
-            res.status(404).json({ error: 'Discussion introuvable.' });
-          } else {
-            const discussion = results[0];
-            res.status(200).json({ discussion });
-          }
+          // Retourner l'occurrence de la discussion avec les participants
+          const discussion = results[0];
+          const participants = results.map(participant => ({
+            id: participant.participantId,
+            userId: participant.userId,
+            isAdmin: participant.isAdmin,
+            addedAt: participant.addedAt,
+            hasNewNotif: participant.hasNewNotif,
+            isArchivedChat: participant.isArchivedChat
+          }));
+
+          res.status(200).json({ discussion, participants });
         }
-      });
+      }
+    });
     }
   });
 });
 
 
+discussion.patch('/admin/:discussionId', function(req,res) {
+  const {discussionId}=req.params;
+  const{participants}= req.body;
+  const sqlquery=`UPDATE participants SET isAdmin=? WHERE userId=? AND discussionId=?`
 
+  participants.forEach((participant) => {
+    const { userId, isAdmin } = participant;
+    const participantQueryValues = [isAdmin, userId, discussionId];
+    
+    database.query(sqlquery, participantQueryValues, (error, participantResults) => {
+      if (error) {
+        console.error('Erreur lors de la création du participant :', error);
+        res.status(500).json({ error: 'Une erreur est survenue lors de la création du participant.' });
+      }
+        else{
+          const getDiscussionQuery = `
+          SELECT d.*, p.id AS participantId, p.userId, p.isAdmin, p.addedAt, p.hasNewNotif, p.isArchivedChat, u.email, u.username, u.firstname, u.lastname, u.photoUrl
+          FROM discussions d
+          INNER JOIN participants p ON d.id = p.discussionid INNER JOIN users u ON p.userId=u.id
+          WHERE d.id = ?
+        `;
+        database.query(getDiscussionQuery, [discussionId], (error, results) => {
+          if (error) {
+            console.error('Erreur lors de la récupération de la discussion :', error);
+            res.status(500).json({ error: 'Une erreur est survenue lors de la récupération de la discussion.' });
+          } else {
+            if (results.length === 0) {
+              res.status(404).json({ error: 'Discussion introuvable.' });
+            } else {
+              // Retourner l'occurrence de la discussion avec les participants
+              const discussion = results;
+              res.status(200).json({ discussion});
+            }
+          }
+        })
+        }
+    });
+  });
+})
+
+
+
+
+discussion.patch('/add/:discussionId', function(req,res) {
+  const {discussionId}=req.params;
+  const{participants}= req.body;
+  const sqlquery=`INSERT INTO participants(userId, isAdmin, addedAt, hasNewNotif, isArchivedChat, discussionId) VALUES(?, ?, ?, ?, ?, ?)`
+
+  participants.forEach((participant) => {
+    const { userId } = participant;
+    const participantQueryValues = [userId, false, new Date(), false, false, discussionId];
+    
+    database.query(sqlquery, participantQueryValues, (error, participantResults) => {
+      if (error) {
+        console.error('Erreur lors de la création du participant :', error);
+        res.status(500).json({ error: 'Une erreur est survenue lors de la création du participant.' });
+      }
+        else{
+          const getDiscussionQuery = `
+          SELECT d.*, p.id AS participantId, p.userId, p.isAdmin, p.addedAt, p.hasNewNotif, p.isArchivedChat, u.email, u.username, u.firstname, u.lastname, u.photoUrl
+          FROM discussions d
+          INNER JOIN participants p ON d.id = p.discussionid INNER JOIN users u ON p.userId=u.id
+          WHERE d.id = ?
+        `;
+        database.query(getDiscussionQuery, [discussionId], (error, results) => {
+          if (error) {
+            console.error('Erreur lors de la récupération de la discussion :', error);
+            res.status(500).json({ error: 'Une erreur est survenue lors de la récupération de la discussion.' });
+          } else {
+            if (results.length === 0) {
+              res.status(404).json({ error: 'Discussion introuvable.' });
+            } else {
+              // Retourner l'occurrence de la discussion avec les participants
+              const discussion = results;
+              res.status(200).json({ discussion});
+            }
+          }
+        })
+        }
+    });
+  });
+})
+
+
+
+
+
+
+
+
+
+
+
+
+discussion.get('/:discussionId', function(req,res){
+  const {discussionId} = req.params;
+
+  const getDiscussionQuery = `
+  SELECT d.*, p.id AS participantId, p.userId, p.isAdmin, p.addedAt, p.hasNewNotif, p.isArchivedChat
+  FROM discussions d
+  INNER JOIN participants p ON d.id = p.discussionid
+  WHERE d.id = ?
+`;
+database.query(getDiscussionQuery, [discussionId], (error, results) => {
+  if (error) {
+    console.error('Erreur lors de la récupération de la discussion :', error);
+    res.status(500).json({ error: 'Une erreur est survenue lors de la récupération de la discussion.' });
+  } else {
+    if (results.length === 0) {
+      res.status(404).json({ error: 'Discussion introuvable.' });
+    } else {
+      // Retourner l'occurrence de la discussion avec les participants
+      const discussion = results[0];
+      const participants = results.map(participant => ({
+        id: participant.participantId,
+        userId: participant.userId,
+        isAdmin: participant.isAdmin,
+        addedAt: participant.addedAt,
+        hasNewNotif: participant.hasNewNotif,
+        isArchivedChat: participant.isArchivedChat
+      }));
+
+      res.status(200).json({ discussion, participants });
+    }
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+})
 
 
 
