@@ -1,10 +1,23 @@
 var express = require('express');
-var user = express.Router();
-var database = require('../../Database/database');
-const bcrypt = require('bcrypt');
 var cors = require('cors')
+const multer = require('multer');
+var user = express.Router();
+const bcrypt = require('bcrypt');
+const path = require('path');
 var jwt = require('jsonwebtoken');
+var database = require('../../Database/database');
 
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: function(req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    const fileName = uniqueSuffix + extension;
+    cb(null, fileName);
+  }
+});
+
+const upload = multer({ storage });
 
 user.use(cors());
 
@@ -93,6 +106,48 @@ user.patch('/profil', function(req, res){
         }
       });
 });
+
+
+
+  // Mettre  à jour la photo de profile 
+
+  user.patch('/photo', upload.single('photo'), function(req, res) {
+    token = req.body.token || req.headers['authorization'];
+    var decodedToken = jwt.decode(token);
+    const  userId   = decodedToken.utilisateurId;
+    const photoUrl = req.file.filename; // Utilisez le nom du fichier généré par Multer
+    console.log(photoUrl)
+    const sql = `
+      UPDATE users
+      SET photoUrl = ?
+      WHERE id = ?
+    `;
+  
+    database.query(sql, [photoUrl, userId], (error, result) => {
+      if (error) {
+        console.error('Erreur lors de la mise à jour de la photo de profil :', error);
+        res.status(500).json({ error: 'Une erreur est survenue lors de la mise à jour de la photo de profil.' });
+      } else {
+        const sql = `SELECT id, email, username, firstname, lastname, photoUrl, createdAt, updatedAt
+        FROM users
+        WHERE id = ?`;
+    
+        database.query(sql, [userId], (error, results) => {
+        if (error) {
+            console.error('Erreur lors de la récupération du profil :', error);
+            return res.status(500).json({ error: 'Une erreur est survenue lors de la récupération du profil.' });
+        }
+    
+        if (results.length === 0) {
+           return res.status(404).json({ error: 'Utilisateur introuvable' });
+        }
+    
+        const profil = results[0];
+        return res.status(200).json(profil);
+      });
+      }
+    });
+  });
 
 
 

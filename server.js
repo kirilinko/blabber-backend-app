@@ -8,6 +8,7 @@ var indexRouter = require('./Routes/Index/Index');
 var userRouter = require('./Routes/User/User');
 var requestRouter = require('./Routes/Request/Request');
 var contactRouter = require('./Routes/Contact/Contact');
+var messageRouter = require('./Routes/Message/Message');
 var discussionRouter = require('./Routes/Discussion/Discussion');
 
 process.env.SECRET_KEY = "groupe7Ifri";
@@ -24,6 +25,7 @@ app.use('/', indexRouter);
 app.use('/user', userRouter);
 app.use('/user/contact', contactRouter);
 app.use('/user/request', requestRouter);
+app.use('/user/message', messageRouter);
 app.use('/user/discussion', discussionRouter);
 
 
