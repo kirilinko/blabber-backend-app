@@ -8,7 +8,6 @@ var database = require('../../Database/database');
 
 message.use(cors());
 
-
 const storage = multer.diskStorage({
     destination: 'uploads/',
     filename: function(req, file, cb) {
@@ -19,8 +18,7 @@ const storage = multer.diskStorage({
     }
   });
   
-  const upload = multer({ storage });
-
+const upload = multer({ storage });
 
 message.use(function(req, res, next) {
     var token = req.body.token || req.headers['authorization'];
@@ -42,8 +40,7 @@ message.use(function(req, res, next) {
     }
 });
 
-
-
+/*Ajouter un message  à une discussion*/
 
 message.post('/:discussionId',upload.single('file') , function(req, res) {
     token = req.body.token || req.headers['authorization'];
@@ -55,53 +52,55 @@ message.post('/:discussionId',upload.single('file') , function(req, res) {
     const { originalname, path, size } = req.file;
     const createdAt = new Date();
     const updatedAt = createdAt; 
-  
-    const sql = `
-      INSERT INTO messages (senderId, receiverDiscussionId, text, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?)
-    `;
+
+    const sql = `INSERT INTO messages (senderId, receiverDiscussionId, text, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?) `;
   
     database.query(sql, [senderId, discussionId, text, createdAt, updatedAt], (error, result) => {
       if (error) {
         console.error('Erreur lors de l\'envoi du message :', error);
         res.status(500).json({ error: 'Une erreur est survenue lors de l\'envoi du message.' });
-      } else {
-        const sqlfile = `INSERT INTO files (originalName, pathUrl, size, messageId) VALUES (?, ?, ?, ?) `;
-         
-       database.query(sqlfile, [originalname, path, size, result.insertId], (error, resultfile) => {
-        if (error) {
-          console.error('Erreur lors de l\'ajout du fichier au message :', error);
-          res.status(500).json({ error: 'Une erreur est survenue lors de l\'ajout du fichier au message.' });
-        } else {
-            const getMessagesSql = `
-            SELECT d.*, m.id AS id_message, m.senderId, m.receiverDiscussionId, m.responseToMsgId, m.text, m.createdAt, m.updatedAt, f.originalName, f.pathUrl, f.size, u.username AS senderUsername, u.firstname, u.lastname, u.email, u.photoUrl
-FROM messages m
-INNER JOIN users u ON m.senderId = u.id
-INNER JOIN discussions d ON m.receiverDiscussionId = d.id
-LEFT JOIN files f ON m.id = f.messageId
-WHERE d.id = ?
-ORDER BY m.createdAt DESC
-          `;
-          database.query(getMessagesSql, [discussionId], (error, messages) => {
-            if (error) {
-              console.error('Erreur lors de la récupération des messages :', error);
-              res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des messages.' });
-            } else {
-              res.status(200).json({messages });
-            }
-          });
-        }
-      });
+      } 
+        else {
+          const sqlfile = `INSERT INTO files (originalName, pathUrl, size, messageId) VALUES (?, ?, ?, ?) `;
+         if(req.file) {  
+            database.query(sqlfile, [originalname, path, size, result.insertId], (error, resultfile) => {
+              if (error) {
+                console.error('Erreur lors de l\'ajout du fichier au message :', error);
+                res.status(500).json({ error: 'Une erreur est survenue lors de l\'ajout du fichier au message.' });
+              }  
+           }); 
+         }
 
-
+        const sqllastmessage=`UPDATE lastmessages SET messageId = ? WHERE discussionId = ?`;
+        database.query(sqllastmessage, [result.insertId, discussionId],(error, updateResult)=>{
+          if(error){
+            console.log("error lors de la mise à jours du lastemessage : ", error)
+          }
+            else {
+              const getMessagesSql = `
+              SELECT d.*, m.id AS id_message, m.senderId, m.receiverDiscussionId, m.responseToMsgId, m.text, m.createdAt, m.updatedAt, l.messageId as id_lastMessage, f.originalName, f.pathUrl, f.size, u.username AS senderUsername, u.firstname, u.lastname, u.email, u.photoUrl
+              FROM messages m
+              INNER JOIN lastmessages l ON m.receiverDiscussionId=l.discussionId
+              INNER JOIN users u ON m.senderId = u.id
+              INNER JOIN discussions d ON m.receiverDiscussionId = d.id
+              LEFT JOIN files f ON m.id = f.messageId
+              WHERE d.id = ?
+              ORDER BY m.createdAt DESC `;
+              database.query(getMessagesSql, [discussionId], (error, messages) => {
+                if (error) {
+                  console.error('Erreur lors de la récupération des messages :', error);
+                  res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des messages.' });
+                }
+                  else {
+                    res.status(200).json({messages });
+                 }
+              });
+             }
+        })
       }
     });
   });
   
-
-
-
-
 
  // ajouter un emodji à un message
 
@@ -112,79 +111,53 @@ ORDER BY m.createdAt DESC
     const {messageId} = req.params;
     const {emodji} = req.body;
   
-    const sql = `
-      INSERT INTO emodjis (userId, emodji, messageId)
-      VALUES (?, ?, ?)
-    `;
-  
+    const sql = `INSERT INTO emodjis (userId, emodji, messageId) VALUES (?, ?, ?) `;
     database.query(sql, [userId, emodji, messageId], (error, result) => {
       if (error) {
         console.error('Erreur lors de l\'ajout de l\'emodji :', error);
         res.status(500).json({ error: 'Une erreur est survenue lors de l\'ajout de l\'emodji.' });
-      } else {
-            
-        const emodjisql = `
-        SELECT m.*, e.*, u.username, u.lastname, u.firstname
-        FROM messages m 
-        INNER JOIN emodjis e ON m.id=e.messageId
-        INNER JOIN users u ON e.userId=u.id
-        WHERE m.id= ? AND e.userId=?
-      `;
-        database.query(emodjisql,[messageId, userId], (error,message)=>{
+      } 
+        else {            
+          const emodjisql = `
+          SELECT m.*, e.*, u.username, u.lastname, u.firstname
+          FROM messages m 
+          INNER JOIN emodjis e ON m.id=e.messageId
+          INNER JOIN users u ON e.userId=u.id
+          WHERE m.id= ? AND e.userId=? `;
+
+          database.query(emodjisql,[messageId, userId], (error,message)=>{
             if(error){
-                res.status(500).json({error:"une erreur est survenu"})
+              res.status(500).json({error:"une erreur est survenu"})
             }
-             else{
+              else{
                 res.status(200).json({message})
-             }
-        })
-          
-      }
+              }
+          })          
+       }
     });
   });
 
 
-
-
-
-
-
-
-
-
-
-
 // message d'une discussion
 message.get('/:discussionId', function(req, res) {
-    const { discussionId } = req.params;
-
-    const getMessagesSql = `
+  const { discussionId } = req.params;
+  const getMessagesSql = `
     SELECT d.*,m.*, u.username AS senderUsername, u.firstname, u.lastname, u.email, u.photoUrl
     FROM messages m
     INNER JOIN users u ON m.senderId = u.id
     INNER JOIN discussions d ON d.id=m.receiverDiscussionId
     WHERE m.receiverDiscussionId = ?
-    ORDER BY m.createdAt ASC
-  `;
+    ORDER BY m.createdAt ASC `;
   database.query(getMessagesSql, [discussionId], (error, messages) => {
     if (error) {
       console.error('Erreur lors de la récupération des messages :', error);
       res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des messages.' });
-    } else {
-      res.status(200).json({messages });
     }
-  });
-
-
-  })
-
-
-
-
-
-
-
-
+     else {
+        res.status(200).json({messages });
+     }
+   });
+})
 
 
 module.exports =message
