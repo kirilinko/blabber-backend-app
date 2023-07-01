@@ -49,7 +49,7 @@ message.post('/:discussionId',upload.single('file') , function(req, res) {
 
     const { discussionId } = req.params;
     const { text } = req.body;
-    const { originalname, path, size } = req.file;
+    const { originalname, filename, size } = req.file;
     const createdAt = new Date();
     const updatedAt = createdAt; 
 
@@ -63,7 +63,7 @@ message.post('/:discussionId',upload.single('file') , function(req, res) {
         else {
           const sqlfile = `INSERT INTO files (originalName, pathUrl, size, messageId) VALUES (?, ?, ?, ?) `;
          if(req.file) {  
-            database.query(sqlfile, [originalname, path, size, result.insertId], (error, resultfile) => {
+            database.query(sqlfile, [originalname, filename, size, result.insertId], (error, resultfile) => {
               if (error) {
                 console.error('Erreur lors de l\'ajout du fichier au message :', error);
                 res.status(500).json({ error: 'Une erreur est survenue lors de l\'ajout du fichier au message.' });

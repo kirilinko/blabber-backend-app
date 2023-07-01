@@ -8,6 +8,7 @@ var jwt = require('jsonwebtoken');
 var database = require('../../Database/database');
 var user = express.Router();
 var cors = require('cors')
+
 const storage = multer.diskStorage({
   destination: 'uploads/',
   filename: function(req, file, cb) {
@@ -19,6 +20,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+
 user.use(cors());
 
 

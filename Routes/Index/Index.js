@@ -33,7 +33,7 @@ index.post('/inscription', function(req, res) {
           }
            else {
             const insertedUserId = results.insertId;
-            database.query('SELECT email, username, firstname, lastname, createdAt, updatedAt FROM users WHERE id = ?', insertedUserId, (error, userResults) => {
+            database.query('SELECT id, email, username, firstname, lastname, createdAt, updatedAt FROM users WHERE id = ?', insertedUserId, (error, userResults) => {
               
               if (error) {
                 console.error('Erreur lors de la récupération des informations de l\'utilisateur :', error);
