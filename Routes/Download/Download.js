@@ -3,7 +3,6 @@ var database = require('../../Database/database');
 var download = express.Router();
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
-const message = require('../Message/Message');
 
 download.use(cors());
 

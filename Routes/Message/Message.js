@@ -9,7 +9,7 @@ var database = require('../../Database/database');
 message.use(cors());
 
 const storage = multer.diskStorage({
-    destination: 'uploads/',
+    destination: 'uploads/documents/',
     filename: function(req, file, cb) {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const extension = path.extname(file.originalname);
