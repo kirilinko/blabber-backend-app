@@ -8,7 +8,7 @@ var jwt = require('jsonwebtoken');
 var database = require('../../Database/database');
 var user = express.Router();
 var cors = require('cors')
-
+  
 const storage = multer.diskStorage({
   destination: 'uploads/photos/',
   filename: function(req, file, cb) {
@@ -115,18 +115,23 @@ user.patch('/profil', function(req, res){
   user.patch('/photo', upload.single('photo'), function(req, res) {
     token = req.body.token || req.headers['authorization'];
     var decodedToken = jwt.decode(token);
-    const  userId   = decodedToken.utilisateurId;
-    const photoUrl = req.file.filename; 
-    console.log(photoUrl)
-    const sql = ` UPDATE users SET photoUrl = ? WHERE id = ? `;
+    const userId = decodedToken.utilisateurId;
   
+    if (!req.file || !req.file.filename) {
+      console.error('Aucun fichier n\'a été téléchargé.');
+      return res.status(400).json({ error: 'Aucun fichier n\'a été téléchargé.' });
+    }
+  
+    const photoUrl = req.file.filename;
+    console.log(photoUrl);
+  
+    const sql = `UPDATE users SET photoUrl = ? WHERE id = ?`;
     database.query(sql, [photoUrl, userId], (error, result) => {
       if (error) {
         console.error('Erreur lors de la mise à jour de la photo de profil :', error);
         res.status(500).json({ error: 'Une erreur est survenue lors de la mise à jour de la photo de profil.' });
-      } 
-       else {
-        const sql = `SELECT id, email, username, firstname, lastname, photoUrl, createdAt, updatedAt FROM users  WHERE id = ?`;
+      } else {
+        const sql = `SELECT id, email, username, firstname, lastname, photoUrl, createdAt, updatedAt FROM users WHERE id = ?`;
         database.query(sql, [userId], (error, results) => {
           if (error) {
             console.error('Erreur lors de la récupération du profil :', error);
@@ -137,10 +142,11 @@ user.patch('/profil', function(req, res){
           }
           const profil = results[0];
           return res.status(200).json(profil);
-       });
+        });
       }
     });
   });
+  
 
 
 
